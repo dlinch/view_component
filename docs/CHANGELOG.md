@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Changelog
-nav_order: 5
+nav_order: 6
 ---
 
 <!-- Add unreleased changes under the "main" heading. -->
@@ -9,6 +9,316 @@ nav_order: 5
 # Changelog
 
 ## main
+
+* Introduce component-local config and migrate `strip_trailing_whitespace` to use it under the hood.
+
+    *Simon Fish*
+
+* Add docs about Slack channel in Ruby Central workspace. (Join us! #oss-view-component). Email joelhawksley@github.com for an invite.
+
+    *Joel Hawksley
+
+* Do not include internal `DocsBuilderComponent` or `YARD::MattrAccessorHandler` in published gem.
+
+    *Joel Hawksley*
+
+* Only lock to `concurrent-ruby` `1.3.4` for Rails 6.1.
+
+    *Joel Hawksley*
+
+* Fix generation of ViewComponent documentation that was broken due to HTML safety issues.
+
+    *Simon Fish*
+
+* Add documentation on how ViewComponent works.
+
+    *Joel Hawksley*
+
+* Clarify that `config.use_deprecated_instrumentation_name` will be removed in v4.
+
+    *Joel Hawksley*
+
+* Run RSpec tests in CI.
+
+    *Joel Hawksley*
+
+## 3.22.0
+
+* Rewrite `ViewComponents at GitHub` documentation as more general `Best practices`.
+
+    *Phil Schalm*, *Joel Hawksley*
+
+* Add unused mechanism for inheriting config from parent modules to enable future engine-local configuration.
+
+    *Simon Fish*
+
+* Improve handling of malformed component edge case when mocking components in tests.
+
+    *Martin Meyerhoff*, *Joel Hawksley*
+
+* Add Content Harmony & Learn To Be to list of companies using ViewComponent.
+
+    *Kane Jamison*
+
+* Clarify error message about render-dependent logic.
+
+  Error messages about render-dependent logic were sometimes inaccurate, saying `during initialization` despite also being raised after a component had been initialized but before it was rendered.
+
+    *Joel Hawksley*
+
+* Remove JS and CSS docs as they proved difficult to maintain and lacked consensus.
+
+    *Joel Hawksley*
+
+* Do not prefix release tags with `v`, per recommendation from @bkuhlmann.
+
+    *Joel Hawksley*
+
+* Add ruby 3.4 support to CI.
+
+    *Reegan Viljoen*
+
+* Add HomeStyler AI to list of companies using ViewComponent.
+
+    *JP Balarini*
+
+## 3.21.0
+
+* Updates testing docs to include an example of how to use with RSpec.
+
+    *Rylan Bowers*
+
+* Add `--skip-suffix` option to component generator.
+
+    *KAWAKAMI Moeki*
+
+* Add FreeATS to list of companies using ViewComponent.
+
+    *Ilia Liamshin*
+
+* Ensure HTML output safety wrapper is used for all inline templates.
+
+    *Joel Hawksley*
+
+* Expose `.identifier` method as part of public API.
+
+    *Joel Hawksley*
+
+* Add rails 8 support to CI.
+
+    *Reegan Viljoen*
+
+* Updates ActionText compatibility documentation to reference `rich_textarea_tag` for Rails 8.0 support.
+
+    *Alvin Crespo*
+
+## 3.20.0
+
+* Allow rendering `with_collection` to accept an optional `spacer_component` to be rendered between each item.
+
+    *Nick Coyne*
+
+* Remove OpenStruct from codebase.
+
+    *Oleksii Vasyliev*
+
+## 3.19.0
+
+* Relax Active Support version constraint in gemspec.
+
+    *Simon Fish*
+
+## 3.18.0
+
+* Enable components to use `@request` and `request` methods/ivars.
+
+    *Blake Williams*
+
+* Fix bug where implicit locales in component filenames threw a `NameError`.
+
+    *Chloe Fons*
+
+* Register ViewComponent tests directory for `rails stats`.
+
+    *Javier Aranda*
+
+* Wrap entire compile step in a mutex to make it more resilient to race conditions.
+
+    *Blake Williams*
+
+* Add [Niva]([niva.co](https://www.niva.co/)) to companies who use `ViewComponent`.
+
+    *Daniel Vu Dao*
+
+* Fix `preview_paths` in docs.
+
+    *Javier Aranda*
+
+## 3.17.0
+
+* Use struct instead openstruct in lib code.
+
+    *Oleksii Vasyliev*
+
+* Fix bug where stimulus controller was not added to ERB when stimulus was activated by default.
+
+    *Denis Pasin*
+
+* Add typescript support to stimulus generator.
+
+    *Denis Pasin*
+
+* Fix the example of #vc_test_request in the API reference to use the correct method name.
+
+    *Alberto Rocha*
+
+* Fix development mode race condition that caused an invalid duplicate template error.
+
+    *Blake Williams*
+
+## 3.16.0
+
+* Add template information to multiple template error messages.
+
+    *Joel Hawksley*
+
+* Add `ostruct` to gemspec file to suppress stdlib removal warning.
+
+    *Jonathan Underwood*
+
+## 3.15.1
+
+* Re-add `@private`, undocumented `.identifier` method that was only meant for internal framework use but was used by some downstream consumers. This method will be removed in a coming minor release.
+
+    *Joel Hawksley*
+
+## 3.15.0
+
+* Add basic internal testing for memory allocations.
+
+    *Joel Hawksley*
+
+* Add support for request formats.
+
+    *Joel Hawksley*
+
+* Add `rendered_json` test helper.
+
+    *Joel Hawksley*
+
+* Add `with_format` test helper.
+
+    *Joel Hawksley*
+
+* Warn if using Ruby < 3.2 or Rails < 7.1, which won't be supported by ViewComponent v4, to be released no earlier than April 1, 2025.
+
+    *Joel Hawksley*
+
+* Add Kicksite to list of companies using ViewComponent.
+
+    *Adil Lari*
+
+* Allow overridden slot methods to use `super`.
+
+    *Andrew Schwartz*
+
+* Add Rails engine support to generators.
+
+    *Tomasz Kowalewski*
+
+* Register stats directories with `Rails::CodeStatistics.register_directory` to support `rails stats` in Rails 8.
+
+    *Petrik de Heus*
+
+* Fixed type declaration for `ViewComponent::TestHelpers.with_controller_class` parameter.
+
+    *Graham Rogers*
+
+## 3.14.0
+
+* Defer to built-in caching for language environment setup, rather than manually using `actions/cache` in CI.
+
+    *Simon Fish*
+
+* Add test coverage for use of `turbo_stream` helpers in components when `capture_compatibility_patch_enabled` is `true`.
+
+  *Simon Fish*
+
+* Add experimental `SlotableDefault` module, allowing components to define a `default_SLOTNAME` method to provide a default value for slots.
+
+    *Joel Hawksley*
+
+* Add documentation on rendering ViewComponents outside of the view context.
+
+    *Joel Hawksley*
+
+* Look for preview files that end in `preview.rb` rather than `_preview.rb` to allow previews to exist in sidecar directory with test files.
+
+    *Seth Herr*
+
+* Add `assert_component_rendered` test helper.
+
+    *Reegan Viljoen*
+
+* Add `prefix:` option to `use_helpers`.
+
+    *Reegan Viljoen*
+
+* Add support for Rails 7.2.
+
+    *Reegan Viljoen*
+
+## 3.13.0
+
+* Add ruby head and YJIT to CI.
+
+    *Reegan Viljoen*
+
+* Fixed a bug where inline templates where unable to remove trailing whitespace without throwing an error.
+
+    *Reegan Viljoen*
+
+* Fixed CI for Rails main.
+
+    *Reegan Viljoen*
+
+* Add `from:` option to `use_helpers` to allow for more flexible helper inclusion from modules.
+
+    *Reegan Viljoen*
+
+* Fixed ruby head matcher issue.
+
+    *Reegan Viljoen*
+
+* Fix a bug where component previews would crash with "undefined local variable or method `preview_source`."
+
+    *Henning Koch*
+
+## 3.12.1
+
+* Ensure content is rendered correctly for forwarded slots.
+
+    *Cameron Dutro*
+
+## 3.12.0
+
+* Remove offline links from resources.
+
+    *Paulo Henrique Meneses*
+
+* Fix templates not being correctly populated when caller location label has a prefix.
+
+  On the upstream version of Ruby, method owners are now included in backtraces as prefixes. This caused the call stack filtering to not work as intended and thus `source_location` to be incorrect for child ViewComponents, consequently not populating templates correctly.
+
+    *Allan Pires, Jason Kim*
+
+* Use component path for generating RSpec files.
+
+  When generating new RSpec files for components, the generator will use the `view_component_path` value in the config to decide where to put the new spec file. For instance, if the `view_component_path` option has been changed to `app/views/components`, the generator will put the spec file in `spec/views/components`. **If the `view_component_path` doesn't start with `app/`, then the generator will fall back to `spec/components/`.**
+
+  This feature is enabled via the `config.view_component.generate.use_component_path_for_rspec_tests` option, defaulting to `false`. The default will change to `true` in ViewComponent v4.
+
+    *William Mathewson*
 
 ## 3.11.0
 
@@ -30,7 +340,7 @@ nav_order: 5
 
 * Include ViewComponent::UseHelpers by default.
 
-      *Reegan Viljoen*
+    *Reegan Viljoen*
 
 * Bump `puma` in Gemfile.lock.
 

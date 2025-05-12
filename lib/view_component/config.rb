@@ -48,6 +48,12 @@ module ViewComponent
       #
       #     config.view_component.generate.stimulus_controller = true
       #
+      # #### `#typescript`
+      #
+      # Generate TypeScript files instead of JavaScript files:
+      #
+      #     config.view_component.generate.typescript = true
+      #
       # #### `#locale`
       #
       # Always generate translations file alongside the component:
@@ -79,6 +85,19 @@ module ViewComponent
       # Defaults to `""`. If this is blank, the generator will use
       # `ViewComponent.config.preview_paths` if defined,
       # `"test/components/previews"` otherwise
+      #
+      # #### `#use_component_path_for_rspec_tests`
+      #
+      # Whether to use the `config.view_component_path` when generating new
+      # RSpec component tests:
+      #
+      #     config.view_component.generate.use_component_path_for_rspec_tests = true
+      #
+      # When set to `true`, the generator will use the `view_component_path` to
+      # decide where to generate the new RSpec component test.
+      # For example, if the `view_component_path` is
+      # `app/views/components`, then the generator will create a new spec file
+      # in `spec/views/components/` rather than the default `spec/components/`.
 
       # @!attribute preview_controller
       # @return [String]
@@ -104,7 +123,7 @@ module ViewComponent
       # @return [Boolean]
       # Whether ActiveSupport Notifications use the private name `"!render.view_component"`
       # or are made more publicly available via `"render.view_component"`.
-      # Will default to `false` in next major version.
+      # Will be removed in next major version.
       # Defaults to `true`.
 
       # @!attribute render_monkey_patch_enabled
@@ -133,7 +152,7 @@ module ViewComponent
       # @!attribute preview_paths
       # @return [Array<String>]
       # The locations in which component previews will be looked up.
-      # Defaults to `['test/component/previews']` relative to your Rails root.
+      # Defaults to `['test/components/previews']` relative to your Rails root.
 
       # @!attribute test_controller
       # @return [String]
@@ -155,9 +174,27 @@ module ViewComponent
       # Defaults to `false`.
 
       def default_preview_paths
+        (default_rails_preview_paths + default_rails_engines_preview_paths).uniq
+      end
+
+      def default_rails_preview_paths
         return [] unless defined?(Rails.root) && Dir.exist?("#{Rails.root}/test/components/previews")
 
         ["#{Rails.root}/test/components/previews"]
+      end
+
+      def default_rails_engines_preview_paths
+        return [] unless defined?(Rails::Engine)
+
+        registered_rails_engines_with_previews.map do |descendant|
+          "#{descendant.root}/test/components/previews"
+        end
+      end
+
+      def registered_rails_engines_with_previews
+        Rails::Engine.descendants.select do |descendant|
+          defined?(descendant.root) && Dir.exist?("#{descendant.root}/test/components/previews")
+        end
       end
 
       def default_generate_options

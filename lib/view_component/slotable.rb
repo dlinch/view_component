@@ -89,11 +89,11 @@ module ViewComponent
           end
           ruby2_keywords(setter_method_name) if respond_to?(:ruby2_keywords, true)
 
-          define_method slot_name do
+          self::GeneratedSlotMethods.define_method slot_name do
             get_slot(slot_name)
           end
 
-          define_method :"#{slot_name}?" do
+          self::GeneratedSlotMethods.define_method :"#{slot_name}?" do
             get_slot(slot_name).present?
           end
 
@@ -176,11 +176,11 @@ module ViewComponent
             end
           end
 
-          define_method slot_name do
+          self::GeneratedSlotMethods.define_method slot_name do
             get_slot(slot_name)
           end
 
-          define_method :"#{slot_name}?" do
+          self::GeneratedSlotMethods.define_method :"#{slot_name}?" do
             get_slot(slot_name).present?
           end
 
@@ -199,19 +199,28 @@ module ViewComponent
         end
       end
 
-      # Clone slot configuration into child class
-      # see #test_slots_pollution
       def inherited(child)
+        # Clone slot configuration into child class
+        # see #test_slots_pollution
         child.registered_slots = registered_slots.clone
+
+        # Add a module for slot methods, allowing them to be overriden by the component class
+        # see #test_slot_name_can_be_overriden
+        unless child.const_defined?(:GeneratedSlotMethods, false)
+          generated_slot_methods = Module.new
+          child.const_set(:GeneratedSlotMethods, generated_slot_methods)
+          child.include generated_slot_methods
+        end
+
         super
       end
 
       def register_polymorphic_slot(slot_name, types, collection:)
-        define_method(slot_name) do
+        self::GeneratedSlotMethods.define_method(slot_name) do
           get_slot(slot_name)
         end
 
-        define_method(:"#{slot_name}?") do
+        self::GeneratedSlotMethods.define_method(:"#{slot_name}?") do
           get_slot(slot_name).present?
         end
 
@@ -259,6 +268,15 @@ module ViewComponent
         }
       end
 
+      # Called by the compiler, as instance methods are not defined when slots are first registered
+      def register_default_slots
+        registered_slots.each do |slot_name, config|
+          config[:default_method] = instance_methods.find { |method_name| method_name == :"default_#{slot_name}" }
+
+          registered_slots[slot_name] = config
+        end
+      end
+
       private
 
       def register_slot(slot_name, **kwargs)
@@ -266,10 +284,7 @@ module ViewComponent
       end
 
       def define_slot(slot_name, collection:, callable:)
-        # Setup basic slot data
-        slot = {
-          collection: collection
-        }
+        slot = {collection: collection}
         return slot unless callable
 
         # If callable responds to `render_in`, we set it on the slot as a renderable
@@ -318,7 +333,6 @@ module ViewComponent
 
       def raise_if_slot_registered(slot_name)
         if registered_slots.key?(slot_name)
-          # TODO remove? This breaks overriding slots when slots are inherited
           raise RedefinedSlotError.new(name, slot_name)
         end
       end
@@ -366,7 +380,7 @@ module ViewComponent
       # 1. If this is a `content_area` style sub-component, we will render the
       # block via the `slot`
       #
-      # 2. Since we've to pass block content to components when calling
+      # 2. Since we have to pass block content to components when calling
       # `render`, evaluating the block here would require us to call
       # `view_context.capture` twice, which is slower
       slot.__vc_content_block = block if block
@@ -417,7 +431,7 @@ module ViewComponent
     def set_polymorphic_slot(slot_name, poly_type = nil, *args, &block)
       slot_definition = self.class.registered_slots[slot_name]
 
-      if !slot_definition[:collection] && (defined?(@__vc_set_slots) && @__vc_set_slots[slot_name])
+      if !slot_definition[:collection] && defined?(@__vc_set_slots) && @__vc_set_slots[slot_name]
         raise ContentAlreadySetForPolymorphicSlotError.new(slot_name)
       end
 

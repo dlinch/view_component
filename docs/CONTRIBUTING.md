@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Contributing
-nav_order: 7
+nav_order: 9
 ---
 
 # Contributing
@@ -15,6 +15,10 @@ If you have any substantial changes that you would like to make, please [open an
 Maintainers tend to focus on areas of the project that are useful to them and their employers, but we're happy to pair with members of the community to enable work on other parts.
 
 Contributions to this project are [released](https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license) to the public under the [MIT license](https://github.com/viewcomponent/view_component/blob/main/LICENSE.txt).
+
+## Slack community
+
+While we prefer using Issues, Discussions, and PRs on GitHub, there is a ViewComponent Slack channel on the Ruby Central workspace: #oss-view-component. Reach out to joelhawksley@github.com for an invite.
 
 ## Reporting bugs
 
@@ -107,11 +111,11 @@ The triagers team is @reeganviljoen.
 
 ### Commit
 
-ViewComponent committers have `write` access, enabling them to push directly to the repository and merge pull requests, thus removing the need to contribute via a fork. Committers often have implicit (or even explicit, via CODEOWNERS) ownership over a particular area of the project, such as previews, generators, or translations.
+ViewComponent committers have `write` access, enabling them to push directly to the repository and merge pull requests, thus removing the need to contribute via a fork.
 
 Triagers are welcome to request commit access by opening a pull request to update this list:
 
-The committers team is @elia, @jonspalmer, @juanmanuelramallo, @rmacklin, and @dylanatsmith.
+There are currently no committers.
 
 ### Maintain
 

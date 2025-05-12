@@ -5,11 +5,14 @@ require "active_support/configurable"
 require "view_component/collection"
 require "view_component/compile_cache"
 require "view_component/compiler"
+require "view_component/component_local_config"
 require "view_component/config"
 require "view_component/errors"
 require "view_component/inline_template"
 require "view_component/preview"
 require "view_component/slotable"
+require "view_component/slotable_default"
+require "view_component/template"
 require "view_component/translatable"
 require "view_component/with_content_helper"
 require "view_component/use_helpers"
@@ -23,6 +26,10 @@ module ViewComponent
       #
       # @return [ActiveSupport::OrderedOptions]
       def config
+        module_parents.each do |m|
+          config = m.try(:config).try(:view_component)
+          return config if config
+        end
         ViewComponent::Config.current
       end
     end
@@ -32,18 +39,16 @@ module ViewComponent
     include ViewComponent::Slotable
     include ViewComponent::Translatable
     include ViewComponent::WithContentHelper
+    include ViewComponent::ComponentLocalConfig
 
     RESERVED_PARAMETER = :content
+    VC_INTERNAL_DEFAULT_FORMAT = :html
 
     # For CSRF authenticity tokens in forms
     delegate :form_authenticity_token, :protect_against_forgery?, :config, to: :helpers
 
     # For Content Security Policy nonces
     delegate :content_security_policy_nonce, to: :helpers
-
-    # Config option that strips trailing whitespace in templates before compiling them.
-    class_attribute :__vc_strip_trailing_whitespace, instance_accessor: false, instance_predicate: false
-    self.__vc_strip_trailing_whitespace = false # class_attribute:default doesn't work until Rails 5.2
 
     attr_accessor :__vc_original_view_context
 
@@ -105,9 +110,9 @@ module ViewComponent
       before_render
 
       if render?
-        # Avoid allocating new string when output_preamble and output_postamble are blank
-        rendered_template = safe_render_template_for(@__vc_variant).to_s
+        rendered_template = render_template_for(@__vc_variant, __vc_request&.format&.to_sym).to_s
 
+        # Avoid allocating new string when output_preamble and output_postamble are blank
         if output_preamble.blank? && output_postamble.blank?
           rendered_template
         else
@@ -188,6 +193,8 @@ module ViewComponent
       true
     end
 
+    # Override the ActionView::Base initializer so that components
+    # do not need to define their own initializers.
     # @private
     def initialize(*)
     end
@@ -244,7 +251,7 @@ module ViewComponent
         raise e, <<~MESSAGE.chomp if view_context && e.is_a?(NameError) && helpers.respond_to?(method_name)
           #{e.message}
 
-          You may be trying to call a method provided as a view helper. Did you mean `helpers.#{method_name}'?
+          You may be trying to call a method provided as a view helper. Did you mean `helpers.#{method_name}`?
         MESSAGE
 
         raise
@@ -276,7 +283,14 @@ module ViewComponent
     #
     # @return [ActionDispatch::Request]
     def request
-      @request ||= controller.request if controller.respond_to?(:request)
+      __vc_request
+    end
+
+    # Enables consumers to override request/@request
+    #
+    # @private
+    def __vc_request
+      @__vc_request ||= controller.request if controller.respond_to?(:request)
     end
 
     # The content passed to the component instance as a block.
@@ -318,7 +332,7 @@ module ViewComponent
     end
 
     def maybe_escape_html(text)
-      return text if request && !request.format.html?
+      return text if __vc_request && !__vc_request.format.html?
       return text if text.blank?
 
       if text.html_safe?
@@ -326,16 +340,6 @@ module ViewComponent
       else
         yield
         html_escape(text)
-      end
-    end
-
-    def safe_render_template_for(variant)
-      if compiler.renders_template_for_variant?(variant)
-        render_template_for(variant)
-      else
-        maybe_escape_html(render_template_for(variant)) do
-          Kernel.warn("WARNING: The #{self.class} component rendered HTML-unsafe output. The output will be automatically escaped, but you may want to investigate.")
-        end
       end
     end
 
@@ -349,10 +353,6 @@ module ViewComponent
       maybe_escape_html(output_postamble) do
         Kernel.warn("WARNING: The #{self.class} component was provided an HTML-unsafe postamble. The postamble will be automatically escaped, but you may want to investigate.")
       end
-    end
-
-    def compiler
-      @compiler ||= self.class.compiler
     end
 
     # Set the controller used for testing components:
@@ -412,6 +412,14 @@ module ViewComponent
     # config.view_component.generate.stimulus_controller = true
     # ```
     #
+    # #### `#typescript`
+    #
+    # Generate TypeScript files instead of JavaScript files:
+    #
+    # ```ruby
+    # config.view_component.generate.typescript = true
+    # ```
+    #
     # #### #locale
     #
     # Always generate translations file alongside the component:
@@ -442,8 +450,16 @@ module ViewComponent
     #  Defaults to `false`.
 
     class << self
+      # The file path of the component Ruby file.
+      #
+      # @return [String]
+      attr_reader :identifier
+
       # @private
-      attr_accessor :source_location, :virtual_path
+      attr_writer :identifier
+
+      # @private
+      attr_accessor :virtual_path
 
       # Find sidecar files for the given extensions.
       #
@@ -453,13 +469,13 @@ module ViewComponent
       # For example, one might collect sidecar CSS files that need to be compiled.
       # @param extensions [Array<String>] Extensions of which to return matching sidecar files.
       def sidecar_files(extensions)
-        return [] unless source_location
+        return [] unless identifier
 
         extensions = extensions.join(",")
 
         # view files in a directory named like the component
-        directory = File.dirname(source_location)
-        filename = File.basename(source_location, ".rb")
+        directory = File.dirname(identifier)
+        filename = File.basename(identifier, ".rb")
         component_name = name.demodulize.underscore
 
         # Add support for nested components defined in the same file.
@@ -484,7 +500,7 @@ module ViewComponent
 
         sidecar_directory_files = Dir["#{directory}/#{component_name}/#{filename}.*{#{extensions}}"]
 
-        (sidecar_files - [source_location] + sidecar_directory_files + nested_component_files).uniq
+        (sidecar_files - [identifier] + sidecar_directory_files + nested_component_files).uniq
       end
 
       # Render a component for each element in a collection ([documentation](/guide/collections)):
@@ -494,16 +510,10 @@ module ViewComponent
       # ```
       #
       # @param collection [Enumerable] A list of items to pass the ViewComponent one at a time.
+      # @param spacer_component [ViewComponent::Base] Component instance to be rendered between items.
       # @param args [Arguments] Arguments to pass to the ViewComponent every time.
-      def with_collection(collection, **args)
-        Collection.new(self, collection, **args)
-      end
-
-      # Provide identifier for ActionView template annotations
-      #
-      # @private
-      def short_identifier
-        @short_identifier ||= defined?(Rails.root) ? source_location.sub("#{Rails.root}/", "") : source_location
+      def with_collection(collection, spacer_component: nil, **args)
+        Collection.new(self, collection, spacer_component, **args)
       end
 
       # @private
@@ -518,12 +528,12 @@ module ViewComponent
         # meaning it will not be called for any children and thus not compile their templates.
         if !child.instance_methods(false).include?(:render_template_for) && !child.compiled?
           child.class_eval <<~RUBY, __FILE__, __LINE__ + 1
-            def render_template_for(variant = nil)
+            def render_template_for(variant = nil, format = nil)
               # Force compilation here so the compiler always redefines render_template_for.
               # This is mostly a safeguard to prevent infinite recursion.
               self.class.compile(raise_errors: true, force: true)
               # .compile replaces this method; call the new one
-              render_template_for(variant)
+              render_template_for(variant, format)
             end
           RUBY
         end
@@ -537,11 +547,13 @@ module ViewComponent
         # Derive the source location of the component Ruby file from the call stack.
         # We need to ignore `inherited` frames here as they indicate that `inherited`
         # has been re-defined by the consuming application, likely in ApplicationComponent.
-        child.source_location = caller_locations(1, 10).reject { |l| l.label == "inherited" }[0].path
+        # We use `base_label` method here instead of `label` to avoid cases where the method
+        # owner is included in a prefix like `ApplicationComponent.inherited`.
+        child.identifier = caller_locations(1, 10).reject { |l| l.base_label == "inherited" }[0].path
 
         # If Rails application is loaded, removes the first part of the path and the extension.
         if defined?(Rails) && Rails.application
-          child.virtual_path = child.source_location.gsub(
+          child.virtual_path = child.identifier.gsub(
             /(.*#{Regexp.quote(ViewComponent::Base.config.view_component_path)})|(\.rb)/, ""
           )
         end
@@ -569,10 +581,6 @@ module ViewComponent
         compile unless compiled?
       end
 
-      # Compile templates to instance methods, assuming they haven't been compiled already.
-      #
-      # Do as much work as possible in this step, as doing so reduces the amount
-      # of work done each time a component is rendered.
       # @private
       def compile(raise_errors: false, force: false)
         compiler.compile(raise_errors: raise_errors, force: force)
@@ -581,22 +589,6 @@ module ViewComponent
       # @private
       def compiler
         @__vc_compiler ||= Compiler.new(self)
-      end
-
-      # we'll eventually want to update this to support other types
-      # @private
-      def type
-        "text/html"
-      end
-
-      # @private
-      def format
-        :html
-      end
-
-      # @private
-      def identifier
-        source_location
       end
 
       # Set the parameter name used when rendering elements of a collection ([documentation](/guide/collections)):
@@ -619,16 +611,38 @@ module ViewComponent
       # end
       # ```
       #
+      # @deprecated Use the new component-local configuration option instead.
+      #
+      #   ```ruby
+      #   class MyComponent < ViewComponent::Base
+      #     configure_view_component do |config|
+      #       config.strip_trailing_whitespace = true
+      #     end
+      #   end
+      #   ```
+      #
       # @param value [Boolean] Whether to strip newlines.
       def strip_trailing_whitespace(value = true)
-        self.__vc_strip_trailing_whitespace = value
+        ViewComponent::Deprecation.deprecation_warning(
+          "strip_trailing_whitespace",
+          <<~DOC
+            Use the new component-local configuration option instead:
+
+            class #{self.class.name} < ViewComponent::Base
+              configure_view_component do |config|
+                config.strip_trailing_whitespace = #{value}
+              end
+            end
+          DOC
+        )
+        view_component_config.strip_trailing_whitespace = value
       end
 
       # Whether trailing whitespace will be stripped before compilation.
       #
       # @return [Boolean]
       def strip_trailing_whitespace?
-        __vc_strip_trailing_whitespace
+        view_component_config.strip_trailing_whitespace
       end
 
       # Ensure the component initializer accepts the
@@ -636,7 +650,7 @@ module ViewComponent
       # validate that the default parameter name
       # is accepted, as support for collection
       # rendering is optional.
-      # @private TODO: add documentation
+      # @private
       def validate_collection_parameter!(validate_default: false)
         parameter = validate_default ? collection_parameter : provided_collection_parameter
 
@@ -656,7 +670,7 @@ module ViewComponent
       # Ensure the component initializer doesn't define
       # invalid parameters that could override the framework's
       # methods.
-      # @private TODO: add documentation
+      # @private
       def validate_initialization_parameters!
         return unless initialize_parameter_names.include?(RESERVED_PARAMETER)
 

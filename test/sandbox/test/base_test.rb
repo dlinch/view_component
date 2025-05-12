@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "view_component/configurable"
 
 class ViewComponent::Base::UnitTest < Minitest::Test
-  def test_templates_parses_all_types_of_paths
+  def test_identifier
+    assert(MyComponent.identifier.include?("test/sandbox/app/components/my_component.rb"))
+  end
+
+  def skip_templates_parses_all_types_of_paths
     file_path = [
       "/Users/fake.user/path/to.templates/component/test_component.html+phone.erb",
       "/_underscore-dash./component/test_component.html+desktop.slim",
@@ -18,7 +23,7 @@ class ViewComponent::Base::UnitTest < Minitest::Test
     compiler = ViewComponent::Compiler.new(ViewComponent::Base)
 
     ViewComponent::Base.stub(:sidecar_files, file_path) do
-      templates = compiler.send(:templates)
+      templates = compiler.send(:gather_templates)
 
       templates.each_with_index do |template, index|
         assert_equal(template[:path], file_path[index])
@@ -39,7 +44,7 @@ class ViewComponent::Base::UnitTest < Minitest::Test
       assert_raises ViewComponent::HelpersCalledBeforeRenderError do
         component.helpers
       end
-    assert_includes err.message, "can't be used during initialization"
+    assert_includes err.message, "can't be used before rendering"
   end
 
   def test_calling_controller_outside_render_raises
@@ -49,7 +54,7 @@ class ViewComponent::Base::UnitTest < Minitest::Test
         component.controller
       end
 
-    assert_includes err.message, "can't be used during initialization"
+    assert_includes err.message, "can't be used before rendering"
   end
 
   def test_sidecar_files
@@ -117,7 +122,7 @@ class ViewComponent::Base::UnitTest < Minitest::Test
     exception_message_regex = Regexp.new <<~MESSAGE.chomp, Regexp::MULTILINE
       undefined method `current_user' for .*
 
-      You may be trying to call a method provided as a view helper. Did you mean `helpers.current_user'?
+      You may be trying to call a method provided as a view helper. Did you mean `helpers.current_user`?
     MESSAGE
     assert !exception_message_regex.match?(exception.message)
   end
@@ -130,7 +135,7 @@ class ViewComponent::Base::UnitTest < Minitest::Test
       end
     }
     exception = assert_raises(NameError) { ReferencesMethodOnHelpersComponent.new.render_in(view_context) }
-    exception_advice = "You may be trying to call a method provided as a view helper. Did you mean `helpers.current_user'?"
+    exception_advice = "You may be trying to call a method provided as a view helper. Did you mean `helpers.current_user`?"
     assert exception.message.include?(exception_advice)
   end
 
@@ -138,8 +143,66 @@ class ViewComponent::Base::UnitTest < Minitest::Test
     view_context = ActionController::Base.new.view_context
     exception = assert_raises(NameError) { ReferencesMethodOnHelpersComponent.new.render_in(view_context) }
     exception_message_regex = Regexp.new <<~MESSAGE.chomp
-      You may be trying to call a method provided as a view helper\\. Did you mean `helpers.current_user'\\?$
+      You may be trying to call a method provided as a view helper\\. Did you mean `helpers.current_user`\\?$
     MESSAGE
     assert !exception_message_regex.match?(exception.message)
+  end
+
+  module TestModuleWithoutConfig
+    class SomeComponent < ViewComponent::Base
+    end
+  end
+
+  # Config defined on top-level module as opposed to engine.
+  module TestModuleWithConfig
+    include ViewComponent::Configurable
+
+    configure do |config|
+      config.view_component.test_controller = "AnotherController"
+    end
+
+    class SomeComponent < ViewComponent::Base
+    end
+  end
+
+  module TestAlreadyConfigurableModule
+    include ActiveSupport::Configurable
+    include ViewComponent::Configurable
+
+    configure do |config|
+      config.view_component.test_controller = "AnotherController"
+    end
+
+    class SomeComponent < ViewComponent::Base
+    end
+  end
+
+  module TestAlreadyConfiguredModule
+    include ActiveSupport::Configurable
+
+    configure do |config|
+      config.view_component = ActiveSupport::InheritableOptions[test_controller: "AnotherController"]
+    end
+
+    include ViewComponent::Configurable
+
+    class SomeComponent < ViewComponent::Base
+    end
+  end
+
+  def test_uses_module_configuration
+    # We override this ourselves in test/sandbox/config/environments/test.rb.
+    assert_equal "IntegrationExamplesController", TestModuleWithoutConfig::SomeComponent.test_controller
+    assert_equal "AnotherController", TestModuleWithConfig::SomeComponent.test_controller
+    assert_equal "AnotherController", TestAlreadyConfigurableModule::SomeComponent.test_controller
+    assert_equal "AnotherController", TestAlreadyConfiguredModule::SomeComponent.test_controller
+  end
+
+  def test_component_local_config_is_inheritable
+    assert_equal false, ViewComponent::Base.view_component_config.strip_trailing_whitespace
+    # This component doesn't call configure, so it should inherit the defaults.
+    assert_equal false, AnotherComponent.view_component_config.strip_trailing_whitespace
+    # This component overrides the defaults.
+    assert_equal true, ConfigurableComponent.view_component_config.strip_trailing_whitespace
   end
 end

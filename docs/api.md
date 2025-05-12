@@ -236,7 +236,7 @@ Defaults to `ViewComponentsController`.
 ### `.preview_paths`
 
 The locations in which component previews will be looked up.
-Defaults to `['test/component/previews']` relative to your Rails root.
+Defaults to `['test/components/previews']` relative to your Rails root.
 
 ### `.preview_route`
 
@@ -269,7 +269,7 @@ Defaults to `ApplicationController`.
 
 Whether ActiveSupport Notifications use the private name `"!render.view_component"`
 or are made more publicly available via `"render.view_component"`.
-Will default to `false` in next major version.
+Will be removed in next major version.
 Defaults to `true`.
 
 ### `.view_component_path`
@@ -343,7 +343,7 @@ Access the request used by `render_inline`:
 
 ```ruby
 test "component does not render in Firefox" do
-  request.env["HTTP_USER_AGENT"] = "Mozilla/5.0"
+  vc_test_request.env["HTTP_USER_AGENT"] = "Mozilla/5.0"
   render_inline(NoFirefoxComponent.new)
   refute_component_rendered
 end
